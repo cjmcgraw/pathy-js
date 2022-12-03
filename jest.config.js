@@ -5,4 +5,5 @@ module.exports = {
   forceExit: true,
   detectOpenHandles: true,
   detectLeaks: true,
+  setupFilesAfterEnv: ["jest-expect-message"],
 };

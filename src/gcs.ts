@@ -3,7 +3,7 @@ import type { StoragePath } from './types'
 import { Storage } from '@google-cloud/storage'
 import fs from 'fs'
 import nodePath from 'path'
-import {Readable, Writable} from "stream";
+import { Readable, Writable } from 'stream'
 
 const gcs = new Storage()
 
@@ -31,9 +31,9 @@ class GcsPath implements StoragePath {
      * all globbing and use the prefix instead then loop through literally
      * every file... christ
      */
-    let prefix = "";
+    let prefix = ''
     if (pattern) {
-      prefix = pattern.split('*', 1)[0];
+      prefix = pattern.split('*', 1)[0]
     }
 
     const files = await this.bucket.getFiles({ prefix })
@@ -46,7 +46,7 @@ class GcsPath implements StoragePath {
     )
   }
 
-  public async rm(options?: {recursive: boolean}): Promise<void> {
+  public async rm(options?: { recursive: boolean }): Promise<void> {
   }
 
   public async exists(): Promise<boolean> {
@@ -55,10 +55,10 @@ class GcsPath implements StoragePath {
   }
 
   public async read(): Promise<Buffer> {
-    throw Error("not yet implemented");
+    throw Error('not yet implemented')
   }
 
   public async write(buf: Buffer): Promise<void> {
-    throw Error("not yet implemented");
+    throw Error('not yet implemented')
   }
 }
