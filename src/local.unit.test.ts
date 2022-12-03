@@ -1,6 +1,5 @@
 import { LocalPath } from './local'
-import { beforeAll, afterAll, test, } from '@jest/globals'
-import { expect } from 'jest-expect-message';
+import { beforeAll, afterAll, test, expect } from '@jest/globals'
 import fs from 'fs/promises'
 import { v4 as uuidv4 } from 'uuid'
 import random from 'random'
@@ -54,7 +53,7 @@ test('glob works as expected with nothing', async () => {
 
   for await (const found of path.glob()) {
     expect(
-      expectedFiles.has(fileFound),
+      expectedFiles.has(ftound),
       `expected found=${found} to be in ${expectedFiles}`
     ).toBeTruthy();
   }
