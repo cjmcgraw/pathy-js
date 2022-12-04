@@ -4,12 +4,22 @@ import fs from 'fs/promises'
 import { v4 as uuidv4 } from 'uuid'
 import random from 'random'
 
+
+
 const TEST_ASSET_DIR = '.testing_assets/'
 const RUN_ASSET_DIR = `${TEST_ASSET_DIR}/${uuidv4().toString()}`
 
-function randomPath(n: number): string {
-  let path = RUN_ASSET_DIR
-  for (let i = 0; i < n; i++) {
+function randomPaths(n: number, options?: {depth?: number, baseDir?: string}): string {
+  const paths = [];
+  for x
+  const {directories, includeRoot} = {
+    directories: 1,
+    includeRoot: false,
+    ...options
+  }
+
+  let path = includeRoot ? RUN_ASSET_DIR : '';
+  for (let i = 0; i < directories; i++) {
     path += uuidv4().toString() + '/'
   }
   return path.replace(/\/$/, '')
@@ -25,7 +35,7 @@ afterAll(async () => {
 
 test('simple CRUD works', async () => {
   const data = uuidv4().toString()
-  const location = randomPath(2)
+  const location = randomPath({directories:2})
   const path = new LocalPath(location)
 
   await expect(path.exists()).resolves.toBeFalsy()
@@ -42,22 +52,18 @@ test('simple CRUD works', async () => {
 test('glob works as expected with nothing', async () => {
   const expectedFiles = new Set()
 
-  const testDir = randomPath(1)
+  const testDir = randomPath({includeRoot: true});
   const path = new LocalPath(testDir)
 
   for (let i = 0; i < 10; i++) {
-    const fileName = randomPath(1)
-    await path.join(fileName).touch()
-    expectedFiles.add(fileName)
+    const filePath = path.join(randomPath());
+    await filePath.touch()
+    expectedFiles.add(file)
   }
 
   for await (const found of path.glob()) {
-    expect(
-      expectedFiles.has(ftound),
-      `expected found=${found} to be in ${expectedFiles}`
-    ).toBeTruthy();
+    expect(expectedFiles.has(found)).toBeTruthy();
   }
-  const foundFiles = new Set(Array.from(found))
 })
 
 test('glob works as expected with multiple files unnested', async () => {

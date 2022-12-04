@@ -1,20 +1,24 @@
 {
     "env": {
-        "es2021": true
+        "node": true,
+        "jest/globals": true
     },
     "root": true,
     "extends": ["eslint:recommended", "plugin:@typescript-eslint/recommended"],
     "parser": "@typescript-eslint/parser",
-    "plugins": ["@typescript-eslint"],
+    "plugins": ["@typescript-eslint", "jest"],
     "parserOptions": {
         "ecmaVersion": "latest",
         "sourceType": "module",
         "project": "tsconfig.json"
     },
 
+    "ignorePatterns": [
+      "jest.config.js"
+    ],
     "rules": {
         "space-before-function-paren": ["error", {"anonymous":  "always", "named":  "never"}],
         "no-unused-vars": "off",
-        "@typescript-eslint/no-unused-vars": ["warn"],
+        "@typescript-eslint/no-unused-vars": ["warn"]
     }
 }

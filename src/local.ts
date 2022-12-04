@@ -1,34 +1,53 @@
-import type { StoragePath } from './types'
+import type { StoragePath } from './base'
 import fs from 'fs'
 import * as nodePath from 'path'
 import glob from 'glob'
-export class LocalPath implements StoragePath {
-  private readonly filepath: string
+import { BasePath } from './base'
 
+export class LocalPath extends BasePath implements StoragePath {
   constructor(path: string) {
-    this.filepath = nodePath.resolve(path)
+    super();
+    this.base = nodePath.dirname(path);
+    this.ext = nodePath.extname(path);
+    this.name = nodePath.basename(path, this.ext);
   }
+
 
   public join(...paths: string[]): StoragePath {
     return new LocalPath(
-      nodePath.join(this.filepath, ...paths)
+      this.fullPath({
+        base: nodePath.join(this.base, ...paths),
+      })
     )
   }
 
   public async mkdir(options?: { parents: boolean }): Promise<void> {
-    fs.mkdirSync(this.filepath, { recursive: options?.parents })
-
+    fs.mkdirSync(this.base, { recursive: options?.parents })
   }
 
   public async touch(): Promise<void> {
-    const fd = fs.openSync(this.filepath, 'a')
-    fs.closeSync(fd)
+    const filePath = this.fullPath();
+    const fileNameWithExt = nodePath.basename(filePath);
+    const extName = nodePath.extname(filePath);
+    this.name = fileNameWithExt.
+    const [...nameParts, ext]
+    if (!this.name) {
+      const endPart = nodePath.basename(this.base)
+      if (!this.exit)
+      const [...nameParts, ext] = endPart.split('.');
+      this.name = nameParts.join('.');
+      this.ext = ext;
+    }
+
+    fs.mkdirSync(nodePath.dirname(filePath), {recursive: true});
+    const fd = fs.openSync(filePath, 'a')
+    await fs.closeSync(fd)
   }
 
   public async * glob(pattern?: string): AsyncIterableIterator<StoragePath> {
     const p = nodePath.join(this.filepath, pattern || '*')
     for (const foundFile of glob.sync(p)) {
-      yield new LocalPath(foundFile)
+      yield new LocalPath(foundFile
     }
   }
 

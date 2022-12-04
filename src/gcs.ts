@@ -1,5 +1,5 @@
 import type { Bucket } from '@google-cloud/storage'
-import type { StoragePath } from './types'
+import type { StoragePath } from './base'
 import { Storage } from '@google-cloud/storage'
 import fs from 'fs'
 import nodePath from 'path'

@@ -4,6 +4,6 @@ module.exports = {
   testEnvironment: 'node',
   forceExit: true,
   detectOpenHandles: true,
-  detectLeaks: true,
+  //detectLeaks: true,
   setupFilesAfterEnv: ["@alex_neo/jest-expect-message"],
 };

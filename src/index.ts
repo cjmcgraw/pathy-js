@@ -1,6 +1,8 @@
+import { StoragePath } from './base'
 import { LocalPath } from './local'
 
 const local = new LocalPath('a/b/c')
+
 
 // function path(pathString: string): StoragePath {
 //  if (pathString.startsWith("gs://")) {
