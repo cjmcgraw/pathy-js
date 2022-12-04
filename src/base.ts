@@ -1,9 +1,10 @@
-import type { FileHandle } from 'fs/promises'
-import type { Readable, Writable } from 'stream'
-import * as nodePath from 'path';
 
+import { Readable, Writable } from 'stream'
+
+// Should be the primary interface through which state is manipulated.
 export interface StoragePath {
 
+  // immutable
   anchor: () => string
   parents: () => string[]
   name: () => string
@@ -13,21 +14,28 @@ export interface StoragePath {
   fullPath: () => string
   join: (...paths: string[]) => StoragePath
 
-  ls: () => AsyncIterableIterator<StoragePath>
+  // kinda mutable
   glob: (pattern?: string) => AsyncIterableIterator<StoragePath>
+  ls: () => AsyncIterableIterator<StoragePath>
+  touch: () => Promise<void>
 
+  // mutable
   exists: () => Promise<boolean>
   isFile: () => Promise<boolean>
   isDir: () => Promise<boolean>
-
-  touch: () => Promise<void>
   mkdir: (options?: { parents: boolean }) => Promise<void>
-
   rm: (options?: { recursive: boolean }) => Promise<void>
+
+  // super mutable
   read: () => Promise<Buffer>
+  readCallback: (callbackFn: () => Buffer) => void
+  readStream: () => Readable;
   write: (buf: Buffer) => Promise<void>
+  writeCallback: (callbackFn: (buf: Buffer) => void) => void
+  writeStream: () => Writable;
 }
 
+// struct?
 export interface PathState {
   anchor: string
   parents: string[]
@@ -35,94 +43,148 @@ export interface PathState {
   sep: string
 }
 
+// all regex run O(length)
+const rootRegex = /^\//;
+const cwdRegex = /^\.\//;
+const schemeRegex = /^(?<anchor>.+:\/\/)/;
+
+// build initial state. Hopefully generates struct that data is shared/copied from
 function buildPathState(sep: string, url: string): PathState {
-    let anchor = '';
+  // need to fill
+  let anchor: string;
+  let parents: string[]
+  let name: string;
 
-    const matches = url.match(/^(?<anchor>.+:\/\/)/);
-    if (matches?.groups?.anchor) {
-      anchor = matches.groups.anchor;
-    } else if (url.startsWith('/')) {
-      anchor = '/';
-    }
+  let parsedUrl: string;
+  let schemeMatch: RegExpMatchArray | null;
+  let cwdMatch: RegExpMatchArray | null;
+  let rootMatch: RegExpMatchArray | null;
+  let validPathParts: string[];
+  console.log(url);
 
-    const parts = url.replace(RegExp(`^${anchor}`), '')
-      .split(sep)
-      .filter(x => x.length > 0);
+  schemeMatch = url.match(schemeRegex);
+  cwdMatch = url.match(cwdRegex);
+  rootMatch = url.match(rootRegex);
 
-    const parents: string[] = []
-    for (const part of parts) {
-      if (part?.length !== 0) {
-        parents.push(part);
-      }
-    }
+  const parseUrl = (match: any) => url.split(match).slice(-1);
+  if (schemeMatch) {
+    anchor = schemeMatch.groups?.anchor ?? '';
+    console.log(url);
+    [parsedUrl] = parseUrl(schemeMatch) ?? url;
+  } else if (cwdMatch) {
+    anchor = '';
+    [parsedUrl] = parseUrl(cwdMatch) ?? url;
+  } else if (rootMatch) {
+    anchor = '/';
+    [parsedUrl] = parseUrl(rootMatch) ?? url;
+  } else {
+    anchor = '';
+    [parsedUrl] = url;
+  }
 
-    /**
-     * we are going to assume that the first parent
-     * is actually the stem. This will change as joins
-     * happen, and the stem will shift down further
-     */
-    const name = parents.pop() ?? '';
-    return {
-      anchor,
-      parents,
-      name,
-      sep
-    }
+  console.log(`parsedUrl=${parsedUrl}`);
+  validPathParts = parsedUrl
+    .split(sep)
+    .filter(x => x?.length > 0);
+
+
+  let parentsRev: string[];
+  [name, ...parentsRev] = validPathParts.reverse();
+  parents = parentsRev.reverse();
+  console.log(validPathParts);
+
+  // return struct
+  return {
+    anchor,
+    parents,
+    name,
+    sep
+  }
 }
 
+// no traits??
 export abstract class BasePath implements StoragePath{
   state: PathState;
 
-  protected constructor(sep: string, data: string|PathState) {
+  // ctor
+  protected constructor(separator: string, data: string|PathState) {
+    // this is super weird. We like carry the separator around for windows?
+    const sep = separator;
+
+    // I don't really know how to share state downwards in an
+    // immutable way. So... I just dynamically typed basically
     if (typeof data === 'string') {
+      console.log("building data");
       data = buildPathState(sep, data)
     }
+
+    // data is minorly mutable
     this.state = data;
   }
 
+  // immutable
   public anchor(): string {
-    return this.state.anchor;
+    const { anchor } = this.state;
+    return anchor;
   }
 
+  // immutable
   public parents(): string[] {
-    return this.state.parents;
+    const { parents } = this.state;
+    return parents;
   }
 
+  // immutable
   public name(): string {
-    return this.state.name;
+    const { name } = this.state;
+    return name;
   }
 
+  // immutable
   public ext(): string {
-    const parts = this.state.name.split(".");
+    const { name } = this.state;
+    let parts: string[];
+
+    // lazy evaluate split
+    parts = name.split(".");
     if (parts.length <= 1) {
       return "";
     }
+
+    // extension is last chunk. Kinda weird sliceop
     const [ext] = parts.slice(-1)
     return ext ?? "";
   }
 
+  // immutable
   public fullPath(): string {
     const { anchor, parents, name } = this.state;
+    let currentParts = [...parents];
 
-    const currentParts = [...parents]
-    if (name?.length > 0) {
+    if (currentParts.length > 0) {
+      // name contains extension
       currentParts.push(name);
     }
 
     return anchor + "" + currentParts.join(this.state.sep);
   }
 
+  // immutable
   public withExt(extension: string): StoragePath {
-    const newExt = extension.replace(/^\./, '');
-    const name = this.state.name.replace(this.ext(), newExt);
+    let newExt = extension.replace(/^\./, '');
+    let [fileName] = this.state.name.split('.', 1);
+
+    // wish I had share
     return this.createNew({
       ...this.state,
       parents: [...this.state.parents],
-      name
+      name: fileName + "." + newExt,
     });
   }
 
+  // immutable
   public withName(name: string): StoragePath {
+    // wish I had share
     return this.createNew({
       ...this.state,
       parents: [...this.state.parents],
@@ -130,11 +192,13 @@ export abstract class BasePath implements StoragePath{
     })
   }
 
+  // immutable
   public join(paths: string): StoragePath {
     const [name, ...parts] = paths.split(this.state.sep)
       .filter(x => x.length > 0)
       .reverse();
 
+    // wish I had share
     return this.createNew({
       ...this.state,
       parents: [
@@ -146,20 +210,23 @@ export abstract class BasePath implements StoragePath{
     });
   }
 
+  // why don't we have new this(...)?
   abstract createNew(data: PathState): StoragePath;
 
-  abstract exists(): Promise<boolean>
 
+  // abstracts must implement interface?????????
+  abstract exists(): Promise<boolean>
   abstract isDir(): Promise<boolean>
   abstract isFile(): Promise<boolean>
-
   abstract ls(): AsyncIterableIterator<StoragePath>
   abstract glob(pattern: string | undefined): AsyncIterableIterator<StoragePath>
-
   abstract mkdir(options?: { parents: boolean }): Promise<void>
   abstract touch(): Promise<void>
-
   abstract rm(options: { recursive: boolean } | undefined): Promise<void>
   abstract read(): Promise<Buffer>
+  abstract readCallback(callbackFn: () => Buffer): void
+  abstract readStream(): Readable
   abstract write(buf: Buffer): Promise<void>
+  abstract writeCallback(callbackFn: (buffer: Buffer) => void): void
+  abstract writeStream(): Writable
 }
