@@ -1,79 +1,86 @@
 import { LocalPath } from './local'
-import { beforeAll, afterAll, test, expect } from '@jest/globals'
+import { describe, beforeAll, afterAll, test, expect } from '@jest/globals'
 import fs from 'fs/promises'
 import { v4 as uuidv4 } from 'uuid'
-import random from 'random'
+import { StoragePath } from './base'
+//import random from 'random'
 
-
-
-const TEST_ASSET_DIR = '.testing_assets/'
+const TEST_ASSET_DIR = '.testing_assets'
 const RUN_ASSET_DIR = `${TEST_ASSET_DIR}/${uuidv4().toString()}`
 
-function randomPaths(n: number, options?: {depth?: number, baseDir?: string}): string {
-  const paths = [];
-  for x
-  const {directories, includeRoot} = {
-    directories: 1,
-    includeRoot: false,
-    ...options
-  }
+describe("LocalPath search functions work", () => {
+  const dataDirectory = RUN_ASSET_DIR + "/" + uuidv4().toString() + "/read_tests";
+  let dirs = [...Array(10).keys()].map(_ => uuidv4().toString());
+  let files: string[] = [];
+  let filesAtLevels: string[][] = [];
 
-  let path = includeRoot ? RUN_ASSET_DIR : '';
-  for (let i = 0; i < directories; i++) {
-    path += uuidv4().toString() + '/'
-  }
-  return path.replace(/\/$/, '')
-}
+  beforeAll(async () => {
+    let path = dataDirectory;
+    files = []
+    filesAtLevels = [];
 
-beforeAll(async () => {
-  await fs.mkdir(TEST_ASSET_DIR, { recursive: true })
-})
+    await fs.mkdir(dirs.join('/'), {recursive: true});
 
-afterAll(async () => {
-  await fs.rm(TEST_ASSET_DIR, { recursive: true, force: true })
-})
+    for (let depth = 0; depth < 10; depth++) {
 
-test('simple CRUD works', async () => {
-  const data = uuidv4().toString()
-  const location = randomPath({directories:2})
-  const path = new LocalPath(location)
+      filesAtLevels.push([]);
+      for (let n = 0; n < 10; n++) {
+        let file = uuidv4().toString();
+        if (Math.random() > 0.5) {
+          file += "." + uuidv4().toString();
+        }
 
-  await expect(path.exists()).resolves.toBeFalsy()
-  await path.write(Buffer.from(data))
+        filesAtLevels[depth].push(file);
 
-  await expect(path.exists()).resolves.toBeTruthy()
-  const buf = await path.read()
+        const fullPath = path + "/" + file;
+        files.push(fullPath);
+        await fs.mkdir(path, {recursive: true});
+        const fd = await fs.open(path + "/" + file, 'a');
+        await fd.close();
+      }
 
-  expect(buf.toString()).toStrictEqual(data)
-  await path.rm()
-  await expect(path.exists()).resolves.toBeFalsy()
-})
+      const newDir = uuidv4().toString();
+      filesAtLevels[depth].push(newDir);
+      dirs.push(newDir);
+      path += "/" +  newDir
+    }
+  });
 
-test('glob works as expected with nothing', async () => {
-  const expectedFiles = new Set()
+  afterAll(async () => {
+    //await fs.rm(dataDirectory, {recursive: true, force: true});
+  });
 
-  const testDir = randomPath({includeRoot: true});
-  const path = new LocalPath(testDir)
+  test("LocalPath.ls()", async () => {
+    let localPath: StoragePath = new LocalPath(dataDirectory);
+    for (let i = 0; i < dirs.length; i++) {
+      console.log(i);
+      const expected = new Set(filesAtLevels[i]);
+      const found = new Set(Array.from(localPath.ls()).map(x => x.name()));
+      expect(found).toStrictEqual(expected);
 
-  for (let i = 0; i < 10; i++) {
-    const filePath = path.join(randomPath());
-    await filePath.touch()
-    expectedFiles.add(file)
-  }
+      const dir = dirs[i];
+      localPath = localPath.join(dir)
+    }
+  });
 
-  for await (const found of path.glob()) {
-    expect(expectedFiles.has(found)).toBeTruthy();
-  }
-})
+  test("LocalPath.glob(...) with **/*", async () => {
+  });
 
-test('glob works as expected with multiple files unnested', async () => {
+  test("LocalPath.glob(...) with /*", async () => {
+    let path = new LocalPath(dataDirectory);
+    for (const expected of filesAtLevels) {
 
-})
+    }
+    const found = new Set([...path.glob("*")].map(x => x.name()));
+    const expected = new Set(filesAtLevels[0]);
+    expect(found).toStrictEqual(expected);
+  });
 
-test('glob works as expected with multiplie files nested', async () => {
+  test("LocalPath.isDir(...)", async () => {
+    expect(true).toBeTruthy();
+  });
 
-})
-
-test('glob works as expected with many files much nesting', async () => {
-
+  test("LocalPath.isFile(...)", async () => {
+    expect(true).toBeTruthy();
+  })
 })

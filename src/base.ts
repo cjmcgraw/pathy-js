@@ -11,12 +11,12 @@ export interface StoragePath {
   ext: () => string
   withExt: (ext: string) => StoragePath
   withName: (name: string) => StoragePath
-  fullPath: () => string
+  toString: () => string
   join: (...paths: string[]) => StoragePath
 
   // kinda mutable
-  glob: (pattern?: string) => AsyncIterableIterator<StoragePath>
-  ls: () => AsyncIterableIterator<StoragePath>
+  glob: (pattern?: string) => Generator<StoragePath, void, void>
+  ls: () => Generator<StoragePath, void, void>
   touch: () => Promise<void>
 
   // mutable
@@ -28,10 +28,9 @@ export interface StoragePath {
 
   // super mutable
   read: () => Promise<Buffer>
-  readCallback: (callbackFn: () => Buffer) => void
+  readCallback: (callbackFn: () => Buffer) => Promise<void>
   readStream: () => Readable;
   write: (buf: Buffer) => Promise<void>
-  writeCallback: (callbackFn: (buf: Buffer) => void) => void
   writeStream: () => Writable;
 }
 
@@ -60,7 +59,6 @@ function buildPathState(sep: string, url: string): PathState {
   let cwdMatch: RegExpMatchArray | null;
   let rootMatch: RegExpMatchArray | null;
   let validPathParts: string[];
-  console.log(url);
 
   schemeMatch = url.match(schemeRegex);
   cwdMatch = url.match(cwdRegex);
@@ -69,20 +67,18 @@ function buildPathState(sep: string, url: string): PathState {
   const parseUrl = (match: any) => url.split(match).slice(-1);
   if (schemeMatch) {
     anchor = schemeMatch.groups?.anchor ?? '';
-    console.log(url);
-    [parsedUrl] = parseUrl(schemeMatch) ?? url;
+    [parsedUrl] = parseUrl(schemeRegex) ?? url;
   } else if (cwdMatch) {
     anchor = '';
-    [parsedUrl] = parseUrl(cwdMatch) ?? url;
+    [parsedUrl] = parseUrl(cwdRegex) ?? url;
   } else if (rootMatch) {
     anchor = '/';
-    [parsedUrl] = parseUrl(rootMatch) ?? url;
+    [parsedUrl] = parseUrl(rootRegex) ?? url;
   } else {
     anchor = '';
-    [parsedUrl] = url;
+    parsedUrl = url;
   }
 
-  console.log(`parsedUrl=${parsedUrl}`);
   validPathParts = parsedUrl
     .split(sep)
     .filter(x => x?.length > 0);
@@ -91,7 +87,6 @@ function buildPathState(sep: string, url: string): PathState {
   let parentsRev: string[];
   [name, ...parentsRev] = validPathParts.reverse();
   parents = parentsRev.reverse();
-  console.log(validPathParts);
 
   // return struct
   return {
@@ -114,7 +109,6 @@ export abstract class BasePath implements StoragePath{
     // I don't really know how to share state downwards in an
     // immutable way. So... I just dynamically typed basically
     if (typeof data === 'string') {
-      console.log("building data");
       data = buildPathState(sep, data)
     }
 
@@ -143,30 +137,15 @@ export abstract class BasePath implements StoragePath{
   // immutable
   public ext(): string {
     const { name } = this.state;
-    let parts: string[];
-
-    // lazy evaluate split
-    parts = name.split(".");
-    if (parts.length <= 1) {
-      return "";
-    }
-
-    // extension is last chunk. Kinda weird sliceop
-    const [ext] = parts.slice(-1)
-    return ext ?? "";
+    const [foundName, ...exts] = name.split(".");
+    return exts.join('.');
   }
 
   // immutable
-  public fullPath(): string {
-    const { anchor, parents, name } = this.state;
-    let currentParts = [...parents];
-
-    if (currentParts.length > 0) {
-      // name contains extension
-      currentParts.push(name);
-    }
-
-    return anchor + "" + currentParts.join(this.state.sep);
+  public toString(): string {
+    const { anchor, parents, name, sep } = this.state;
+    let currentParts = [...parents, name];
+    return anchor + "" + currentParts.join(sep);
   }
 
   // immutable
@@ -193,8 +172,8 @@ export abstract class BasePath implements StoragePath{
   }
 
   // immutable
-  public join(paths: string): StoragePath {
-    const [name, ...parts] = paths.split(this.state.sep)
+  public join(...paths: string[]): StoragePath {
+    const [name, ...parts] = paths
       .filter(x => x.length > 0)
       .reverse();
 
@@ -218,15 +197,14 @@ export abstract class BasePath implements StoragePath{
   abstract exists(): Promise<boolean>
   abstract isDir(): Promise<boolean>
   abstract isFile(): Promise<boolean>
-  abstract ls(): AsyncIterableIterator<StoragePath>
-  abstract glob(pattern: string | undefined): AsyncIterableIterator<StoragePath>
+  abstract ls(): Generator<StoragePath, void, void>
+  abstract glob(pattern: string | undefined): Generator<StoragePath, void, void>
   abstract mkdir(options?: { parents: boolean }): Promise<void>
   abstract touch(): Promise<void>
   abstract rm(options: { recursive: boolean } | undefined): Promise<void>
   abstract read(): Promise<Buffer>
-  abstract readCallback(callbackFn: () => Buffer): void
+  abstract readCallback(callbackFn: () => Buffer): Promise<void>
   abstract readStream(): Readable
   abstract write(buf: Buffer): Promise<void>
-  abstract writeCallback(callbackFn: (buffer: Buffer) => void): void
   abstract writeStream(): Writable
 }

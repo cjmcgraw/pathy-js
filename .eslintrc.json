@@ -19,7 +19,7 @@
     "rules": {
         "space-before-function-paren": ["error", {"anonymous":  "always", "named":  "never"}],
         "@typescript-eslint/no-unused-vars": ["warn"],
-      "no-unused-vars": "off",
-        "prefer-const": "off",
+        "no-unused-vars": "off",
+        "prefer-const": "off"
     }
 }

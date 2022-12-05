@@ -1,71 +1,91 @@
-import type { StoragePath } from './base'
+import type { PathState, StoragePath } from './base'
 import fs from 'fs'
 import * as nodePath from 'path'
 import glob from 'glob'
 import { BasePath } from './base'
+import { Readable, Writable } from 'stream'
 
 export class LocalPath extends BasePath implements StoragePath {
-  constructor(path: string) {
-    super();
-    this.base = nodePath.dirname(path);
-    this.ext = nodePath.extname(path);
-    this.name = nodePath.basename(path, this.ext);
+
+  constructor(path?: string|PathState) {
+    super(nodePath.sep, path ?? "./");
   }
 
-
-  public join(...paths: string[]): StoragePath {
-    return new LocalPath(
-      this.fullPath({
-        base: nodePath.join(this.base, ...paths),
-      })
-    )
+  createNew(data: PathState): StoragePath {
+    return new LocalPath(data);
   }
 
-  public async mkdir(options?: { parents: boolean }): Promise<void> {
-    fs.mkdirSync(this.base, { recursive: options?.parents })
-  }
-
-  public async touch(): Promise<void> {
-    const filePath = this.fullPath();
-    const fileNameWithExt = nodePath.basename(filePath);
-    const extName = nodePath.extname(filePath);
-    this.name = fileNameWithExt.
-    const [...nameParts, ext]
-    if (!this.name) {
-      const endPart = nodePath.basename(this.base)
-      if (!this.exit)
-      const [...nameParts, ext] = endPart.split('.');
-      this.name = nameParts.join('.');
-      this.ext = ext;
-    }
-
-    fs.mkdirSync(nodePath.dirname(filePath), {recursive: true});
-    const fd = fs.openSync(filePath, 'a')
-    await fs.closeSync(fd)
-  }
-
-  public async * glob(pattern?: string): AsyncIterableIterator<StoragePath> {
-    const p = nodePath.join(this.filepath, pattern || '*')
-    for (const foundFile of glob.sync(p)) {
-      yield new LocalPath(foundFile
+  * ls(): Generator<StoragePath, void, void> {
+    const p = this.toString();
+    for (const file of fs.readdirSync(p)) {
+      yield new LocalPath(file);
     }
   }
 
-  public async exists(): Promise<boolean> {
-    return fs.existsSync(this.filepath)
+  * glob(pattern?: string): Generator<StoragePath, void, void> {
+    const p = this.toString() + nodePath.sep + (pattern ?? "*");
+    for (const filepath of glob.sync(p)) {
+      if (filepath.length > 0) {
+        yield new LocalPath(filepath);
+      }
+    }
   }
 
-  public async rm(options?: { recursive: boolean }): Promise<void> {
-    await fs.rmSync(this.filepath, { ...options, force: true })
+  async touch(): Promise<void> {
+    const p = this.toString();
+    let fd = fs.openSync(p, 'a');
+    fs.closeSync(fd);
   }
 
-  public async read(): Promise<Buffer> {
-    return fs.readFileSync(this.filepath)
+  async mkdir(options?: { parents: boolean }): Promise<void> {
+    const p = this.toString();
+    fs.mkdirSync(p, {recursive: options?.parents});
   }
 
-  public async write(buf: Buffer): Promise<void> {
-    const dirname = nodePath.dirname(this.filepath)
-    await fs.promises.mkdir(dirname, { recursive: true })
-    await fs.writeFileSync(this.filepath, buf)
+  async rm(options?: { recursive: boolean }): Promise<void> {
+    const p = this.toString();
+    await fs.rmSync(p, {...options, force: true});
+  }
+
+  async exists(): Promise<boolean> {
+    const p = this.toString();
+    return fs.existsSync(p);
+  }
+
+  async isDir(): Promise<boolean> {
+    const p = this.toString();
+    return fs.lstatSync(p).isDirectory();
+  }
+
+  async isFile(): Promise<boolean> {
+    const p = this.toString();
+    return fs.lstatSync(p).isFile();
+  }
+
+  async read(): Promise<Buffer> {
+    const p = this.toString();
+    const fd = fs.openSync(p, 'r');
+    return fs.readFileSync(fd);
+  }
+
+  async readCallback(callbackFn: (buffer: Buffer) => void): Promise<void> {
+    this.readStream().on('data', callbackFn);
+  }
+
+  readStream(): Readable {
+    const p = this.toString();
+    return fs.createReadStream(p);
+  }
+
+  async write(buf: Buffer): Promise<void> {
+    const p = this.toString();
+    const fd = fs.openSync(p, 'w');
+    fs.writeFileSync(fd, buf);
+    fs.closeSync(fd);
+  }
+
+  writeStream(): Writable {
+    const p = this.toString();
+    return fs.createWriteStream(p);
   }
 }
