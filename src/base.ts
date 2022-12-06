@@ -25,6 +25,7 @@ export interface StoragePath {
   isDir: () => Promise<boolean>
   mkdir: (options?: { parents: boolean }) => Promise<void>
   rm: (options?: { recursive: boolean }) => Promise<void>
+  mv: (path: string|StoragePath) => Promise<StoragePath>
 
   // super mutable
   read: () => Promise<Buffer>
@@ -201,7 +202,8 @@ export abstract class BasePath implements StoragePath{
   abstract glob(pattern: string | undefined): Generator<StoragePath, void, void>
   abstract mkdir(options?: { parents: boolean }): Promise<void>
   abstract touch(): Promise<void>
-  abstract rm(options: { recursive: boolean } | undefined): Promise<void>
+  abstract rm(options?: { recursive: boolean }): Promise<void>
+  abstract mv(path: string|StoragePath): Promise<StoragePath>
   abstract read(): Promise<Buffer>
   abstract readCallback(callbackFn: () => Buffer): Promise<void>
   abstract readStream(): Readable

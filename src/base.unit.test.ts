@@ -256,6 +256,7 @@ class TestPathImpl extends BasePath {
   createNew(data: PathState): StoragePath { return new TestPathImpl(data) }
   glob(pattern?: string): Generator<StoragePath, void, void> { throw Error("not implemented")}
   rm(options?: { recursive: boolean }): Promise<void> { throw Error("not implemented")}
+  mv(path: string|StoragePath): Promise<StoragePath> { throw Error("not implemeneted")}
   exists(): Promise<boolean> { throw Error("not implemented")}
   isDir(): Promise<boolean> { throw Error("not implemented")}
   isFile(): Promise<boolean> { throw Error("not implemented")}

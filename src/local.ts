@@ -38,13 +38,20 @@ export class LocalPath extends BasePath implements StoragePath {
   }
 
   async mkdir(options?: { parents: boolean }): Promise<void> {
-    const p = this.toString();
+    const p = this.state.parents.join(this.state.sep);
     fs.mkdirSync(p, {recursive: options?.parents});
   }
 
   async rm(options?: { recursive: boolean }): Promise<void> {
     const p = this.toString();
     await fs.rmSync(p, {...options, force: true});
+  }
+
+  async mv(path: string|StoragePath): Promise<StoragePath> {
+    const src = this.toString();
+    const dest = path.toString();
+    fs.renameSync(src, dest);
+    return new LocalPath(dest);
   }
 
   async exists(): Promise<boolean> {

@@ -185,15 +185,15 @@ describe("LocalPath CRUD works", () => {
 
   test("LocalPath.mkdir()", async () => {
     let path = new LocalPath(dataDir).join(uuidv4());
-    await path.mkdir();
+    await path.join('file').mkdir();
     const stats = await fs.promises.lstat(path.toString());
     expect(stats).toBeTruthy();
     expect(stats.isDirectory()).toBeTruthy();
   });
 
   test("LocalPath.mkdir({parents: true})", async () => {
-    let path = new LocalPath(dataDir).join(uuidv4(), uuidv4(), uuidv4(), uuidv4());
-    await path.mkdir({parents: true});
+    let path = new LocalPath(dataDir).join(uuidv4(), uuidv4(), uuidv4());
+    await path.join('file').mkdir({parents: true});
     const stats = await fs.promises.lstat(path.toString());
     expect(stats).toBeTruthy();
     expect(stats.isDirectory()).toBeTruthy();
@@ -223,6 +223,22 @@ describe("LocalPath CRUD works", () => {
     await new Promise(r => setTimeout(r, 1000));
     expect(fs.existsSync(filePath)).toBeFalsy();
     expect(fs.existsSync(`${dataDir}/${topLevelDir}`)).toBeFalsy();
+  });
+
+  test("LocalPath.mv", async () => {
+    const src = new LocalPath(dataDir).join("some", "src", "file")
+    const expected = uuidv4();
+    await src.mkdir({parents: true});
+    await src.write(Buffer.from(expected));
+
+    const dst = new LocalPath(dataDir).join("other", "dst", "file");
+    await dst.mkdir({parents: true});
+
+    await src.mv(dst);
+
+    const fd = fs.openSync(dst.toString(), 'r');
+    const data = fs.readFileSync(fd).toString();
+    expect(data).toStrictEqual(expected);
   });
 
   test("LocalPath.read()", async () => {

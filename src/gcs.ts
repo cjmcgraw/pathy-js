@@ -1,64 +1,78 @@
 import type { Bucket } from '@google-cloud/storage'
-import type { StoragePath } from './base'
+import type { PathState, StoragePath } from './base'
 import { Storage } from '@google-cloud/storage'
-import fs from 'fs'
-import nodePath from 'path'
 import { Readable, Writable } from 'stream'
+import { BasePath } from './base'
 
 const gcs = new Storage()
 
-class GcsPath implements StoragePath {
-  private readonly bucketString: string
-  private readonly pathString: string
+class GcsPath extends BasePath implements StoragePath {
   private readonly bucket: Bucket
 
-  constructor(bucket: string, path: string, bucketObj?: Bucket) {
-    this.bucketString = bucket
-    this.pathString = path
-    this.bucket = bucketObj ?? gcs.bucket(bucket)
+  constructor(path: string | PathState, bucketObj?: Bucket) {
+    super("/", path);
+    const [bucketName, ..._rest] = this.state.parents;
+    this.bucket = bucketObj ?? gcs.bucket(bucketName)
   }
 
-  public join(...paths: string[]): StoragePath {
-    return new GcsPath(
-      this.bucketString,
-      nodePath.join(this.pathString, ...paths),
-      this.bucket
-    )
+  createNew(data: PathState): StoragePath {
+    return new GcsPath(data, this.bucket);
   }
 
-  public async glob(pattern?: string): Promise<StoragePath[]> {
-    /** unfortunately we cannot actually glob easily. We need to strip off
-     * all globbing and use the prefix instead then loop through literally
-     * every file... christ
-     */
-    let prefix = ''
-    if (pattern) {
-      prefix = pattern.split('*', 1)[0]
-    }
-
-    const files = await this.bucket.getFiles({ prefix })
-    return files.map(
-      foundPath => new GcsPath(
-        this.bucketString,
-        foundPath,
-        this.bucket
-      )
-    )
+  exists(): Promise<boolean> {
+    return this.bucket.exists()
   }
 
-  public async rm(options?: { recursive: boolean }): Promise<void> {
+  glob(pattern: string | undefined): Generator<StoragePath, void, void> {
+    return undefined
   }
 
-  public async exists(): Promise<boolean> {
-    const [metadata] = await this.bucket.file(this.pathString).getMetadata()
-    return Boolean(metadata?.name)
+  isDir(): Promise<boolean> {
+    return Promise.resolve(false)
   }
 
-  public async read(): Promise<Buffer> {
-    throw Error('not yet implemented')
+  isFile(): Promise<boolean> {
+    return Promise.resolve(false)
   }
 
-  public async write(buf: Buffer): Promise<void> {
-    throw Error('not yet implemented')
+  ls(): Generator<StoragePath, void, void> {
+    return undefined
+  }
+
+  touch(): Promise<void> {
+    return Promise.resolve(undefined)
+  }
+
+  mkdir(options?: { parents: boolean }): Promise<void> {
+    return Promise.resolve(undefined)
+  }
+
+  rm(options?: { recursive: boolean }): Promise<void> {
+    return Promise.resolve(undefined)
+  }
+
+  mv(path: string | StoragePath): Promise<StoragePath> {
+    return Promise.resolve(undefined)
+  }
+
+  read(): Promise<Buffer> {
+    return Promise.resolve(undefined)
+  }
+
+  readCallback(callbackFn: () => Buffer): Promise<void> {
+    return Promise.resolve(undefined)
+  }
+
+  readStream(): Readable {
+    return undefined
+  }
+
+
+  write(buf: Buffer): Promise<void> {
+    return Promise.resolve(undefined)
+  }
+
+  writeStream(): Writable {
+    return undefined
   }
 }
