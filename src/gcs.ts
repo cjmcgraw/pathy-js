@@ -3,6 +3,7 @@ import type { PathState, StoragePath } from './base'
 import { Storage } from '@google-cloud/storage'
 import { Readable, Writable } from 'stream'
 import { BasePath } from './base'
+import {LocalPath} from "./local";
 
 const gcs = new Storage()
 
@@ -19,60 +20,80 @@ class GcsPath extends BasePath implements StoragePath {
     return new GcsPath(data, this.bucket);
   }
 
-  exists(): Promise<boolean> {
-    return this.bucket.exists()
+  getGcsBucketPath(): string {
+    const [bucket, ...parts] = [...this.parents(), this.name()];
+    return parts.join(this.state.sep);
   }
 
-  glob(pattern: string | undefined): Generator<StoragePath, void, void> {
-    return undefined
-  }
-
-  isDir(): Promise<boolean> {
-    return Promise.resolve(false)
-  }
-
-  isFile(): Promise<boolean> {
-    return Promise.resolve(false)
-  }
-
-  ls(): Generator<StoragePath, void, void> {
-    return undefined
+  async exists(): Promise<boolean> {
+    const path = this.getGcsBucketPath()
+    const [acls, meta] = await this.bucket.file(path).acl.get();
+    return Boolean(meta);
   }
 
   touch(): Promise<void> {
-    return Promise.resolve(undefined)
+    return this.write(Buffer.from(''));
   }
 
-  mkdir(options?: { parents: boolean }): Promise<void> {
-    return Promise.resolve(undefined)
+  async rm(options?: { recursive: boolean }): Promise<void> {
+    const path = this.getGcsBucketPath();
+    await this.bucket.file(path).delete({ignoreNotFound: true});
   }
 
-  rm(options?: { recursive: boolean }): Promise<void> {
-    return Promise.resolve(undefined)
+  async mv(path: string | StoragePath): Promise<StoragePath> {
+    const src = this.getGcsBucketPath();
+    await this.bucket.file(src).move(path.toString());
+    return null as unknown as StoragePath;
   }
 
-  mv(path: string | StoragePath): Promise<StoragePath> {
-    return Promise.resolve(undefined)
+  async read(): Promise<Buffer> {
+    const path = this.getGcsBucketPath();
+    const [contents] = await this.bucket.file(path).download()
+    return contents;
   }
-
-  read(): Promise<Buffer> {
-    return Promise.resolve(undefined)
-  }
-
-  readCallback(callbackFn: () => Buffer): Promise<void> {
-    return Promise.resolve(undefined)
+  async readCallback(callbackFn: (buf: Buffer) => void): Promise<void> {
+    this.readStream().on('data', callbackFn);
   }
 
   readStream(): Readable {
-    return undefined
+    const path = this.getGcsBucketPath();
+    return this.bucket.file(path).createReadStream();
   }
 
-
-  write(buf: Buffer): Promise<void> {
-    return Promise.resolve(undefined)
+  async write(buf: Buffer): Promise<void> {
+    const ws = this.writeStream();
+    ws.write(buf);
+    ws.uncork();
+    ws.destroy();
   }
 
   writeStream(): Writable {
+    const path = this.getGcsBucketPath();
+    return this.bucket.file(path)
+      .createWriteStream();
+  }
+
+  /////////////////////////////////////////////////////
+  // under construction
+  ////////////////////////////////////////////////////
+
+  mkdir(options?: { parents: boolean }): Promise<void> {
+    throw new Error("GCS has no true notion of a directory");
+  }
+
+  isDir(): Promise<boolean> {
+    throw new Error("GCS has no true notion of a directory");
+  }
+
+  isFile(): Promise<boolean> {
+    throw new Error("GCS has no true notion of a file at the end of a directory");
+  }
+
+  * glob(pattern: string | undefined): Generator<StoragePath, void, void> {
+    return undefined
+  }
+
+  * ls(): Generator<StoragePath, void, void> {
     return undefined
   }
 }
