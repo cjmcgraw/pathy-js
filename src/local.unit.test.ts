@@ -92,7 +92,7 @@ describe("LocalPath search functions work", () => {
     }
   });
 
-  test("LocalPath.exists(...)", async() => {
+  test("LocalPath.exists(...)", async () => {
     for (const file of filesWithDirs) {
       let p = new LocalPath(file);
       await expect(p.exists()).resolves.toBeTruthy();
@@ -120,7 +120,7 @@ describe("LocalPath search functions work", () => {
     }
   });
 
-  test("LocalPath( **/*.ext )", async() => {
+  test("LocalPath( **/*.ext )", async () => {
     let p = new LocalPath(dataDir);
     for (const expected of filesWithExt) {
       const [ext] = expected.split(".").slice(-1);
@@ -225,23 +225,72 @@ describe("LocalPath CRUD works", () => {
     expect(fs.existsSync(`${dataDir}/${topLevelDir}`)).toBeFalsy();
   });
 
-  test("LocalPath.read()", async() => {
+  test("LocalPath.read()", async () => {
+    const filePath = dataDir + "/" + uuidv4();
+    const fd = fs.openSync(filePath, 'w');
+    const expected = uuidv4();
+    fs.writeFileSync(fd, expected);
+    fs.closeSync(fd);
 
+    const path = new LocalPath(filePath);
+    const data = await path.read();
+    expect(data.toString()).toStrictEqual(expected);
   });
 
-  test("LocalPath.readCallback()", async() => {
+  test("LocalPath.readCallback()", done => {
+    const filePath = dataDir + "/" + uuidv4();
+    const fd = fs.openSync(filePath, 'w');
+    const expected = uuidv4();
+    fs.writeFileSync(fd, expected);
+    fs.closeSync(fd);
 
+    const path = new LocalPath(filePath);
+    path.readCallback((buf) => {
+      expect(buf.toString()).toStrictEqual(expected);
+      done();
+    });
   });
 
-  test("LocalPath.readStream()", async() => {
+  test("LocalPath.readStream()", done => {
+    const filePath = dataDir + "/" + uuidv4();
+    const fd = fs.openSync(filePath, 'w');
+    const expected = uuidv4();
+    fs.writeFileSync(fd, expected);
+    fs.closeSync(fd);
 
+    const path = new LocalPath(filePath);
+    const readStream = path.readStream();
+    readStream.on('data', (buf) => {
+      expect(buf.toString()).toStrictEqual(expected);
+      done();
+    });
   });
 
-  test("LocalPath.write()", async() => {
+  test("LocalPath.write()", async () => {
+    const filePath = `${dataDir}/${uuidv4()}`;
+    const path = new LocalPath(filePath);
+    const expected = uuidv4();
+    await path.write(Buffer.from(expected));
 
+    const fd = fs.openSync(filePath, 'r');
+    const data = fs.readFileSync(fd).toString();
+    fs.closeSync(fd);
+    expect(data).toStrictEqual(expected);
   });
 
-  test("LocalPath.writeStream()", async() => {
-
+  test("LocalPath.writeStream()", done => {
+    const filePath = `${dataDir}/${uuidv4()}`;
+    const path = new LocalPath(filePath);
+    const expected = uuidv4();
+    const writeStream = path.writeStream()
+    writeStream.write(Buffer.from(expected));
+    writeStream.uncork();
+    writeStream.end(() => {
+      const fd = fs.openSync(filePath, 'r');
+      const data = fs.readFileSync(fd).toString();
+      fs.closeSync(fd);
+      expect(data).toStrictEqual(expected);
+      done();
+    });
   });
 });
